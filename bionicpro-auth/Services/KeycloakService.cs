@@ -19,19 +19,26 @@ namespace BionicProAuth.Services
             _configuration = configuration;
         }
 
-        public async Task<UserSessionTokens> ExchangeCodeForTokensAsync(string code)
-        {
-            var tokenEndpoint = GetTokenEndpoint();
-            var parameters = new Dictionary<string, string>
-            {
-                { "grant_type", "authorization_code" },
-                { "code", code },
-                { "redirect_uri", _configuration["Keycloak:RedirectUri"] ?? "" },
-                { "client_id", _configuration["Keycloak:ClientId"] ?? "" }
-            };
+public async Task<UserSessionTokens> ExchangeCodeForTokensAsync(string code, string codeVerifier)
+{
+    // Если внутренний URL задан в docker-compose, берем его. Если нет (локальный запуск без Docker) — берем обычный.
+    var keycloakUrl = _configuration["Keycloak:InternalUrl"] ?? _configuration["Keycloak:Url"];
+    var realm = _configuration["Keycloak:Realm"];
+    
+    // Самостоятельно собираем правильный endpoint для обмена токенов
+    var tokenEndpoint = $"{keycloakUrl?.TrimEnd('/')}/realms/{realm}/protocol/openid-connect/token";
 
-            return await SendTokenRequestAsync(tokenEndpoint, parameters);
-        }
+    var parameters = new Dictionary<string, string>
+    {
+        { "grant_type", "authorization_code" },
+        { "code", code },
+        { "redirect_uri", _configuration["Keycloak:RedirectUri"] ?? "" },
+        { "client_id", _configuration["Keycloak:ClientId"] ?? "" },
+        { "code_verifier", codeVerifier } 
+    };
+
+    return await SendTokenRequestAsync(tokenEndpoint, parameters);
+}
 
         public async Task<UserSessionTokens> RefreshTokensAsync(string refreshToken)
         {

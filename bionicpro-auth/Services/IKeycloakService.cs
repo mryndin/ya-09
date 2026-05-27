@@ -5,7 +5,7 @@ namespace BionicProAuth.Services
 {
     public interface IKeycloakService
     {
-        Task<UserSessionTokens> ExchangeCodeForTokensAsync(string code);
+        Task<UserSessionTokens> ExchangeCodeForTokensAsync(string code, string codeVerifier);
         Task<UserSessionTokens> RefreshTokensAsync(string refreshToken);
     }
 }

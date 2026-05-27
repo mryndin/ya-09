@@ -1,8 +1,11 @@
 using System;
+using System.Security.Cryptography; // Добавили для SHA256 и RandomNumberGenerator
+using System.Text;                  // Добавили для Encoding
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities; // Добавили для WebEncoders
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using BionicProAuth.Models;
@@ -33,9 +36,31 @@ namespace BionicProAuth.Controllers
             var clientId = _configuration["Keycloak:ClientId"];
             var redirectUri = _configuration["Keycloak:RedirectUri"];
 
+            // 1. Генерируем случайный криптографический code_verifier
+            var randomBytes = new byte[32];
+            RandomNumberGenerator.Fill(randomBytes);
+            var codeVerifier = WebEncoders.Base64UrlEncode(randomBytes);
+
+            // 2. Хэшируем его через SHA-256 для получения code_challenge
+            using var sha256 = SHA256.Create();
+            var challengeBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(codeVerifier));
+            var codeChallenge = WebEncoders.Base64UrlEncode(challengeBytes);
+
+            // 3. Сохраняем верификатор во временную HttpOnly куку (на 5 минут)
+            Response.Cookies.Append("pkce_verifier", codeVerifier, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true, 
+                SameSite = SameSiteMode.Lax,
+                Expires = DateTimeOffset.UtcNow.AddMinutes(5)
+            });
+
+            // 4. Добавляем параметры code_challenge и метод S256 в URL редиректа
             var authUrl = $"{keycloakUrl}/realms/{realm}/protocol/openid-connect/auth" +
                           $"?client_id={clientId}&response_type=code" +
-                          $"&redirect_uri={Uri.EscapeDataString(redirectUri!)}&scope=openid";
+                          $"&redirect_uri={Uri.EscapeDataString(redirectUri!)}&scope=openid" +
+                          $"&code_challenge={codeChallenge}" +
+                          $"&code_challenge_method=S256";
 
             return Redirect(authUrl);
         }
@@ -45,21 +70,31 @@ namespace BionicProAuth.Controllers
         {
             if (string.IsNullOrEmpty(code)) return BadRequest("Code is missing.");
 
+            // 1. Достаем наш сохраненный pkce_verifier из куки
+            if (!Request.Cookies.TryGetValue("pkce_verifier", out var codeVerifier) || string.IsNullOrEmpty(codeVerifier))
+            {
+                return BadRequest("PKCE verifier is missing or expired.");
+            }
+
+            // 2. Сразу удаляем временную куку, она больше не нужна
+            Response.Cookies.Delete("pkce_verifier");
+
             try
             {
-                var sessionTokens = await _keycloakService.ExchangeCodeForTokensAsync(code);
+                // 3. Передаем code_verifier в сервис обмена токенов (нужно обновить сигнатуру метода!)
+                var sessionTokens = await _keycloakService.ExchangeCodeForTokensAsync(code, codeVerifier);
                 var sessionId = Guid.NewGuid().ToString();
 
                 var serialized = JsonSerializer.Serialize(sessionTokens);
                 await _cache.SetStringAsync(sessionId, serialized, new DistributedCacheEntryOptions
                 {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) // Сессия живет дольше access_token
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
                 });
 
                 var cookieOptions = new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = true, // Защита от перехвата в незащищенном трафике
+                    Secure = true,
                     SameSite = SameSiteMode.Lax,
                     Expires = DateTimeOffset.UtcNow.AddMinutes(30)
                 };

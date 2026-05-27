@@ -8,9 +8,10 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - Keycloak__Url=http://keycloak:8080
+      - Keycloak__Url=http://localhost:8080
+      - Keycloak__InternalUrl=http://keycloak:8080
       - Frontend__Url=http://localhost:3000
-      - BackendApi__Url=http://reports-api:5000
+      - BackendApi__Url=http://localhost:5000
     depends_on:
       - keycloak
   keycloak_db:
