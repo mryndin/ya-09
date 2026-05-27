@@ -1,6 +1,18 @@
 version: '3.8'
 
 services:
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - Keycloak__Url=http://keycloak:8080
+      - Frontend__Url=http://localhost:3000
+      - BackendApi__Url=http://reports-api:5000
+    depends_on:
+      - keycloak
   keycloak_db:
     image: postgres:14
     environment:
