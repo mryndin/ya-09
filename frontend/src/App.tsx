@@ -6,22 +6,22 @@ const App: React.FC = () => {
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    // Проверяем сессию на BFF
+    // РџСЂРѕРІРµСЂСЏРµРј СЃРµСЃСЃРёСЋ РЅР° BFF
     fetch('http://localhost:5000/api/auth/status', { credentials: 'include' })
       .then(res => {
         if (res.ok) setAuthorized(true);
-        else window.location.href = 'http://localhost:5000/api/auth/login'; // Редирект на флоу авторизации бэкенда
+        else window.location.href = 'http://localhost:5000/api/auth/login'; // Р РµРґРёСЂРµРєС‚ РЅР° С„Р»РѕСѓ Р°РІС‚РѕСЂРёР·Р°С†РёРё Р±СЌРєРµРЅРґР°
       })
       .catch(() => window.location.href = 'http://localhost:5000/api/auth/login')
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div>Инициализация защищенной сессии...</div>;
-  if (!authorized) return <div>Перенаправление на авторизацию...</div>;
+  if (loading) return <div>РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Р·Р°С‰РёС‰РµРЅРЅРѕР№ СЃРµСЃСЃРёРё...</div>;
+  if (!authorized) return <div>РџРµСЂРµРЅР°РїСЂР°РІР»РµРЅРёРµ РЅР° Р°РІС‚РѕСЂРёР·Р°С†РёСЋ...</div>;
 
   return (
     <div className="App">
-      {/* Компонент ReportPage внутри себя должен делать fetch на http://localhost:5000/api/proxy/reports с { credentials: 'include' } */}
+      {/* РљРѕРјРїРѕРЅРµРЅС‚ ReportPage РІРЅСѓС‚СЂРё СЃРµР±СЏ РґРѕР»Р¶РµРЅ РґРµР»Р°С‚СЊ fetch РЅР° http://localhost:5000/api/proxy/reports СЃ { credentials: 'include' } */}
       <ReportPage />
     </div>
   );

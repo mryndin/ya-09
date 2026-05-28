@@ -53,13 +53,13 @@ public async Task<UserSessionTokens> ExchangeCodeForTokensAsync(string code, str
             return await SendTokenRequestAsync(tokenEndpoint, parameters);
         }
 
-        private string GetTokenEndpoint()
-        {
-            var url = _configuration["Keycloak:Url"];
-            var realm = _configuration["Keycloak:Realm"];
-            return $"{url}/realms/{realm}/protocol/openid-connect/token";
-        }
-
+private string GetTokenEndpoint()
+{
+    // Берем внутренний URL для контейнеров, если он есть, иначе откатываемся на обычный
+    var url = _configuration["Keycloak:InternalUrl"] ?? _configuration["Keycloak:Url"];
+    var realm = _configuration["Keycloak:Realm"];
+    return $"{url?.TrimEnd('/')}/realms/{realm}/protocol/openid-connect/token";
+}
         private async Task<UserSessionTokens> SendTokenRequestAsync(string endpoint, Dictionary<string, string> parameters)
         {
             var content = new FormUrlEncodedContent(parameters);
