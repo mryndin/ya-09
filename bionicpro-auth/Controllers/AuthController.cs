@@ -46,13 +46,14 @@ namespace BionicProAuth.Controllers
             var challengeBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(codeVerifier));
             var codeChallenge = WebEncoders.Base64UrlEncode(challengeBytes);
 
-            // 3. Сохраняем верификатор во временную HttpOnly куку (на 5 минут)
+            // 3. Сохраняем верификатор во временную HttpOnly куку (на 30 минут)
+
             Response.Cookies.Append("pkce_verifier", codeVerifier, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true, 
+                Secure = false, // вот тут к чертям https
                 SameSite = SameSiteMode.Lax,
-                Expires = DateTimeOffset.UtcNow.AddMinutes(5)
+                Expires = DateTimeOffset.UtcNow.AddMinutes(30)
             });
 
             // 4. Добавляем параметры code_challenge и метод S256 в URL редиректа
@@ -94,7 +95,7 @@ namespace BionicProAuth.Controllers
                 var cookieOptions = new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = true,
+                    Secure = false,
                     SameSite = SameSiteMode.Lax,
                     Expires = DateTimeOffset.UtcNow.AddMinutes(30)
                 };

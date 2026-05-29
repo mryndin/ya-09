@@ -1,0 +1,8 @@
+E:\work\Yandex\Sprints\ya-09\bionicpro-analytics\obj\Debug\net10.0\bionicpro-analytics.csproj.AssemblyReference.cache
+E:\work\Yandex\Sprints\ya-09\bionicpro-analytics\obj\Debug\net10.0\rpswa.dswa.cache.json
+E:\work\Yandex\Sprints\ya-09\bionicpro-analytics\obj\Debug\net10.0\bionicpro-analytics.GeneratedMSBuildEditorConfig.editorconfig
+E:\work\Yandex\Sprints\ya-09\bionicpro-analytics\obj\Debug\net10.0\bionicpro-analytics.AssemblyInfoInputs.cache
+E:\work\Yandex\Sprints\ya-09\bionicpro-analytics\obj\Debug\net10.0\bionicpro-analytics.AssemblyInfo.cs
+E:\work\Yandex\Sprints\ya-09\bionicpro-analytics\obj\Debug\net10.0\bionicpro-analytics.csproj.CoreCompileInputs.cache
+E:\work\Yandex\Sprints\ya-09\bionicpro-analytics\obj\Debug\net10.0\bionicpro-analytics.MvcApplicationPartsAssemblyInfo.cache
+E:\work\Yandex\Sprints\ya-09\bionicpro-analytics\obj\Debug\net10.0\bionicpro-analytics.sourcelink.json
