@@ -93,33 +93,49 @@ namespace BionicProAuth.Controllers
 
             try
             {
-                // 5. ПРОКСИРОВАНИЕ БИНАРНОГО ПОТОКА
+                // 5. БЕЗОПАСНОЕ ПРОКСИРОВАНИЕ БИНАРНОГО ПОТОКА С ПАРАМЕТРАМИ ПЕРИОДА
                 var backendTarget = "http://bionicpro-analytics:8080";
-                var forwardRequest = new HttpRequestMessage(HttpMethod.Get, $"{backendTarget}/api/internal/reports");
                 
-                // Передаем проверенный бэкендом ID пользователя в заголовке X-User-Id
+                // Проверяем QueryString на пустоту и корректность
+                var queryString = Request.QueryString.HasValue ? Request.QueryString.Value : string.Empty;
+                
+                // Защита от мусорных символов, ломающих эндпоинты аналитики
+                if (queryString == "?" || queryString == "?*")
+                {
+                    queryString = string.Empty;
+                }
+
+                var targetUrl = $"{backendTarget}/api/internal/reports{queryString}";
+                
+                // Логируем исходящий запрос для отладки в консоли bionicpro-auth
+                Console.WriteLine($"[BFF Proxy] Forwarding request to: {targetUrl} for User-Id: {userId}");
+
+                var forwardRequest = new HttpRequestMessage(HttpMethod.Get, targetUrl);
                 forwardRequest.Headers.Add("X-User-Id", userId);
 
-                // Оптимизация: Начинаем читать ответ, как только пришли заголовки (ResponseHeadersRead)
+                // Оптимизация: Считываем только заголовки на старте
                 var apiResponse = await _httpClient.SendAsync(forwardRequest, HttpCompletionOption.ResponseHeadersRead);
                 
                 if (!apiResponse.IsSuccessStatusCode)
                 {
-                    return StatusCode((int)apiResponse.StatusCode, "Служба аналитики вернула ошибку при обработке отчета.");
+                    // Вычитываем точную ошибку из аналитики (LINQ/ClickHouse), чтобы шлюз записал её в логи
+                    var errorDetails = await apiResponse.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BFF Proxy ERROR] Analytics service returned {apiResponse.StatusCode}. Details: {errorDetails}");
+                    
+                    return StatusCode((int)apiResponse.StatusCode, $"Служба аналитики вернула ошибку: {errorDetails}");
                 }
 
-                // Читаем бинарный контент напрямую как поток байт
+                // Передаем бинарный контент напрямую как чистый поток байт
                 var responseStream = await apiResponse.Content.ReadAsStreamAsync();
                 
-                // Извлекаем Content-Type, возвращенный аналитикой (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
                 var contentType = apiResponse.Content.Headers.ContentType?.ToString() 
                                   ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-                // Пробрасываем "чистый" стрим фронтенду
                 return File(responseStream, contentType);
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[BFF Proxy Critical Exception] {ex.Message}");
                 return StatusCode(500, $"Ошибка сетевого взаимодействия со службой аналитики: {ex.Message}");
             }
         }
@@ -134,7 +150,6 @@ namespace BionicProAuth.Controllers
                 var parts = accessToken.Split('.');
                 if (parts.Length < 2) return string.Empty;
 
-                // Декодируем Payload часть (второй сегмент JWT)
                 var payload = parts[1];
                 payload = payload.Replace('-', '+').Replace('_', '/');
                 switch (payload.Length % 4)
@@ -149,8 +164,6 @@ namespace BionicProAuth.Controllers
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
-                // Ищем кастомное поле user_id (если настроен маппер в Keycloak) 
-                // или стандартное поле темы "sub" (Subject Claim)
                 if (root.TryGetProperty("user_id", out var userIdProp))
                 {
                     return userIdProp.ToString();

@@ -3,7 +3,20 @@ import React, { useState } from 'react';
 const ReportPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false); // Добавим статус успешного скачивания
+  const [success, setSuccess] = useState(false);
+
+  // Вычисляем вчерашний день в формате YYYY-MM-DD для ограничения календаря
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const maxDateString = yesterday.toISOString().split('T')[0];
+
+  // Состояния для выбранных дат (по умолчанию — последние 7 дней)
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(maxDateString);
 
   const downloadReport = async () => {
     try {
@@ -11,10 +24,12 @@ const ReportPage: React.FC = () => {
       setError(null);
       setSuccess(false);
 
-      // Стучимся на прокси-эндпоинт бэкенда (BFF)
-      const response = await fetch('http://localhost:5000/api/proxy/reports', {
+      // Формируем URL с query-параметрами дат
+      const url = `http://localhost:5000/api/proxy/reports?fromDate=${fromDate}&toDate=${toDate}`;
+
+      const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include' // Передает куку BIONIC_SESSION
+        credentials: 'include' 
       });
 
       if (response.status === 401) {
@@ -23,28 +38,21 @@ const ReportPage: React.FC = () => {
       }
 
       if (!response.ok) {
-        throw new Error(`Ошибка сервера: ${response.status}`);
+        // Если бэкенд вернул 400 или 404 с текстом ошибки
+        const textError = await response.text();
+        throw new Error(textError || `Ошибка сервера: ${response.status}`);
       }
 
-      // 1. Получаем ответ в виде бинарного Blob (а не json)
       const blob = await response.blob();
-
-      // 2. Создаем временную URL-ссылку на этот Blob в памяти браузера
       const downloadUrl = window.URL.createObjectURL(blob);
-
-      // 3. Создаем невидимый тег <a> для программного клика
       const link = document.createElement('a');
       link.href = downloadUrl;
       
-      // Имя файла (браузер подхватит его из бэкенда, либо можно захардкодить свое)
-      link.setAttribute('download', `analytics_report_${new Date().toISOString().slice(0,10)}.xlsx`);
+      link.setAttribute('download', `analytics_report_${fromDate}_to_${toDate}.xlsx`);
       
-      // Добавляем в документ, кликаем и удаляем
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
-
-      // 4. Освобождаем память, удаляя временную ссылку
       window.URL.revokeObjectURL(downloadUrl);
       
       setSuccess(true);
@@ -60,10 +68,34 @@ const ReportPage: React.FC = () => {
       <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-2xl">
         <h1 className="text-2xl font-bold mb-6 text-gray-800">Usage Reports</h1>
         
+        {/* Блок выбора периода */}
+        <div className="flex gap-4 mb-6">
+          <div className="flex flex-col flex-1">
+            <label className="text-sm font-medium text-gray-600 mb-1">С даты:</label>
+            <input 
+              type="date" 
+              value={fromDate}
+              max={maxDateString}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex flex-col flex-1">
+            <label className="text-sm font-medium text-gray-600 mb-1">По дату (включительно):</label>
+            <input 
+              type="date" 
+              value={toDate}
+              max={maxDateString} // Ограничиваем только обработанными Airflow данными
+              onChange={(e) => setToDate(e.target.value)}
+              className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
         <button
           onClick={downloadReport}
           disabled={loading}
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors ${
+          className={`w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors ${
             loading ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
@@ -71,14 +103,14 @@ const ReportPage: React.FC = () => {
         </button>
 
         {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md">
+          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mt-4 p-4 bg-green-100 text-green-700 rounded-md">
-            Отчет успешно сгенерирован и сохранен в Загрузки!
+          <div className="mt-4 p-4 bg-green-100 text-green-700 rounded-md text-sm">
+            Отчет за период с {fromDate} по {toDate} успешно сохранен!
           </div>
         )}
       </div>

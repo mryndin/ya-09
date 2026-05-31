@@ -26,3 +26,4 @@ E:\work\Yandex\Sprints\ya-09\bionicpro-auth\obj\Debug\net10.0\refint\bionicpro-a
 E:\work\Yandex\Sprints\ya-09\bionicpro-auth\obj\Debug\net10.0\bionicpro-auth.pdb
 E:\work\Yandex\Sprints\ya-09\bionicpro-auth\obj\Debug\net10.0\bionicpro-auth.genruntimeconfig.cache
 E:\work\Yandex\Sprints\ya-09\bionicpro-auth\obj\Debug\net10.0\ref\bionicpro-auth.dll
+E:\work\Yandex\Sprints\ya-09\bionicpro-auth\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt

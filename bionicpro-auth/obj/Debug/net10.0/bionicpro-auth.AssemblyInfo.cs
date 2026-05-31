@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("bionicpro-auth")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0def52c0f1cc9bd02a8ef29670327ac15994d30e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8aa07c4770c8fd840630b004581e8f5ea6d43b48")]
 [assembly: System.Reflection.AssemblyProductAttribute("bionicpro-auth")]
 [assembly: System.Reflection.AssemblyTitleAttribute("bionicpro-auth")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
