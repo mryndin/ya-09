@@ -1,54 +1,55 @@
--- 1. Таблица пользователей CRM
-CREATE TABLE IF NOT EXISTS crm_users (
-    id SERIAL PRIMARY KEY,
+-- Очистка старой структуры перед инициализацией
+DROP TABLE IF EXISTS telemetry_ticks CASCADE;
+DROP TABLE IF EXISTS crm_prosthetics CASCADE;
+DROP TABLE IF EXISTS crm_users CASCADE;
+
+-- 1. Таблица пользователей CRM (с UUID из LDAP в качестве PK)
+CREATE TABLE crm_users (
+    user_guid UUID PRIMARY KEY,
     username VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Индекс на updated_at критически важен, чтобы Airflow быстро забирал только измененных пользователей (инкремент)
-CREATE INDEX IF NOT EXISTS idx_crm_users_updated_at ON crm_users(updated_at);
+CREATE INDEX idx_crm_users_updated_at ON crm_users(updated_at);
 
-
--- 2. Таблица установленных протезов
-CREATE TABLE IF NOT EXISTS crm_prosthetics (
+-- 2. Таблица установленных протезов (связь по UUID)
+CREATE TABLE crm_prosthetics (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,
-    device_id VARCHAR(50) UNIQUE NOT NULL, -- Уникальный серийный номер/ID датчика протеза
+    user_guid UUID NOT NULL REFERENCES crm_users(user_guid) ON DELETE CASCADE,
+    device_id VARCHAR(50) UNIQUE NOT NULL, 
     model_name VARCHAR(100) NOT NULL,
     last_service_date DATE NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
--- 3. Таблица сырых тиков телеметрии (куда поступают IoT-данные с датчиков)
-CREATE TABLE IF NOT EXISTS telemetry_ticks (
+-- 3. Таблица сырых тиков телеметрии (привязка к железке device_id)
+CREATE TABLE telemetry_ticks (
     id BIGSERIAL PRIMARY KEY,
     device_id VARCHAR(50) NOT NULL REFERENCES crm_prosthetics(device_id) ON DELETE CASCADE,
     tick_timestamp TIMESTAMP NOT NULL,
-    steps INTEGER DEFAULT 0,            -- Количество шагов, зафиксированных за этот тик
-    active_seconds INTEGER DEFAULT 0,   -- Время активного использования в секундах
-    battery_cycles INTEGER DEFAULT 0    -- Текущее количество циклов зарядки батареи
+    steps INTEGER DEFAULT 0,
+    active_seconds INTEGER DEFAULT 0,
+    battery_cycles INTEGER DEFAULT 0
 );
 
--- Индекс для оптимизации выборки Airflow по временным интервалам (target_date)
-CREATE INDEX IF NOT EXISTS idx_telemetry_ticks_timestamp ON telemetry_ticks(tick_timestamp);
+CREATE INDEX idx_telemetry_ticks_timestamp ON telemetry_ticks(tick_timestamp);
 
--- Добавим тестового пользователя (например, mryndin)
-INSERT INTO crm_users (id, username, email, updated_at) 
-VALUES (1, 'mryndin', 'mryndin@bionicpro.ru', CURRENT_TIMESTAMP)
-ON CONFLICT DO NOTHING;
+-- ========================================================
+-- НАПОЛНЕНИЕ ТЕСТОВЫМИ ДАННЫМИ
+-- ========================================================
 
--- Привяжем к нему модель протеза
-INSERT INTO crm_prosthetics (id, user_id, device_id, model_name, last_service_date)
-VALUES (1, 1, 'DEV-BIO-999', 'Bionic-Hand-Ultra-v10', '2026-01-15')
-ON CONFLICT DO NOTHING;
+-- Вместо жесткого UUID пишем маркер:
+INSERT INTO crm_users (user_guid, username, email, updated_at) 
+VALUES ('{{JOHN_DOE_UUID}}', 'john.doe', 'john@example.com', CURRENT_TIMESTAMP);
 
--- Набросаем сырых логов за май 2026 года (для симуляции работы датчиков)
+INSERT INTO crm_prosthetics (user_guid, device_id, model_name, last_service_date)
+VALUES ('{{JOHN_DOE_UUID}}', 'DEV-BIO-999', 'Bionic-Hand-Ultra-v10', '2026-01-15');
+
+-- Генерируем сырые тики активности протеза за 27 мая 2026 года
 INSERT INTO telemetry_ticks (device_id, tick_timestamp, steps, active_seconds, battery_cycles)
 VALUES 
 ('DEV-BIO-999', '2026-05-27 08:00:00', 1200, 1800, 42),
 ('DEV-BIO-999', '2026-05-27 14:30:00', 2500, 3600, 42),
-('DEV-BIO-999', '2026-05-27 21:00:00', 800, 900, 43)
-ON CONFLICT DO NOTHING;
+('DEV-BIO-999', '2026-05-27 21:00:00', 800, 900, 43);

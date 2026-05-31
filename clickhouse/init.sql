@@ -1,5 +1,9 @@
-CREATE TABLE IF NOT EXISTS default.v_user_prosthetic_reports (
-    user_id UInt64,
+-- Удаляем старую витрину, если она была
+DROP TABLE IF EXISTS default.v_user_prosthetic_reports;
+
+-- Создаем витрину с типом UUID
+CREATE TABLE default.v_user_prosthetic_reports (
+    user_guid UUID,
     report_date Date,
     model_name String,
     steps_count UInt32,
@@ -8,5 +12,5 @@ CREATE TABLE IF NOT EXISTS default.v_user_prosthetic_reports (
     last_service_date Date,
     sync_updated_at DateTime
 ) ENGINE = ReplacingMergeTree(sync_updated_at)
-PRIMARY KEY (user_id)
-ORDER BY (user_id, report_date);
+PRIMARY KEY (user_guid)
+ORDER BY (user_guid, report_date);

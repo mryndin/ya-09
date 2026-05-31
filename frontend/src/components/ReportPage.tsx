@@ -2,23 +2,22 @@ import React, { useState } from 'react';
 
 const ReportPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [reports, setReports] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false); // Добавим статус успешного скачивания
 
   const downloadReport = async () => {
     try {
       setLoading(true);
       setError(null);
+      setSuccess(false);
 
-      // Стучимся на прокси-эндпоинт нашего бэкенда (BFF)
+      // Стучимся на прокси-эндпоинт бэкенда (BFF)
       const response = await fetch('http://localhost:5000/api/proxy/reports', {
         method: 'GET',
-        // КРИТИЧЕСКИ ВАЖНО: передает куку BIONIC_SESSION в запросе к бэкенду
-        credentials: 'include' 
+        credentials: 'include' // Передает куку BIONIC_SESSION
       });
 
       if (response.status === 401) {
-        // Если сессия протухла в процессе, отправляем пользователя на перелогин
         window.location.href = 'http://localhost:5000/api/auth/login';
         return;
       }
@@ -27,8 +26,28 @@ const ReportPage: React.FC = () => {
         throw new Error(`Ошибка сервера: ${response.status}`);
       }
 
-      const data = await response.json();
-      setReports(data);
+      // 1. Получаем ответ в виде бинарного Blob (а не json)
+      const blob = await response.blob();
+
+      // 2. Создаем временную URL-ссылку на этот Blob в памяти браузера
+      const downloadUrl = window.URL.createObjectURL(blob);
+
+      // 3. Создаем невидимый тег <a> для программного клика
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // Имя файла (браузер подхватит его из бэкенда, либо можно захардкодить свое)
+      link.setAttribute('download', `analytics_report_${new Date().toISOString().slice(0,10)}.xlsx`);
+      
+      // Добавляем в документ, кликаем и удаляем
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+
+      // 4. Освобождаем память, удаляя временную ссылку
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Произошла ошибка при загрузке отчетов');
     } finally {
@@ -48,7 +67,7 @@ const ReportPage: React.FC = () => {
             loading ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
-          {loading ? 'Generating Report...' : 'Download Report'}
+          {loading ? 'Generating Excel...' : 'Download Excel Report'}
         </button>
 
         {error && (
@@ -57,12 +76,9 @@ const ReportPage: React.FC = () => {
           </div>
         )}
 
-        {reports && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-md border border-gray-200">
-            <h3 className="font-semibold mb-2 text-gray-700">Полученные данные:</h3>
-            <pre className="text-xs overflow-auto max-h-60 bg-gray-900 text-green-400 p-3 rounded">
-              {JSON.stringify(reports, null, 2)}
-            </pre>
+        {success && (
+          <div className="mt-4 p-4 bg-green-100 text-green-700 rounded-md">
+            Отчет успешно сгенерирован и сохранен в Загрузки!
           </div>
         )}
       </div>

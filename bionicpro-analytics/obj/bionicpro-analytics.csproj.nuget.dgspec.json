@@ -59,6 +59,10 @@
             "ClickHouse.Client": {
               "target": "Package",
               "version": "[7.4.0, )"
+            },
+            "ClosedXML": {
+              "target": "Package",
+              "version": "[0.105.0, )"
             }
           },
           "imports": [

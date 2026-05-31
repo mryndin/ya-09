@@ -86,7 +86,6 @@ namespace BionicProAuth.Controllers
 
             // 4. ИЗВЛЕКАЕМ USER ID ИЗ JWT (ACCESS TOKEN)
             string userId = ExtractUserIdFromJwt(tokens.AccessToken);
-            userId = "1"; // залипуха
             if (string.IsNullOrEmpty(userId))
             {
                 return BadRequest("Не удалось извлечь идентификатор пользователя из токена безопасности.");
@@ -94,22 +93,30 @@ namespace BionicProAuth.Controllers
 
             try
             {
-                // 5. ПРОКСИРОВАНИЕ: Идем в наш новый bionicpro-analytics внутри Docker сети
-                // Используем порт 8080 и внутренний роут
+                // 5. ПРОКСИРОВАНИЕ БИНАРНОГО ПОТОКА
                 var backendTarget = "http://bionicpro-analytics:8080";
                 var forwardRequest = new HttpRequestMessage(HttpMethod.Get, $"{backendTarget}/api/internal/reports");
                 
                 // Передаем проверенный бэкендом ID пользователя в заголовке X-User-Id
                 forwardRequest.Headers.Add("X-User-Id", userId);
 
-                var apiResponse = await _httpClient.SendAsync(forwardRequest);
+                // Оптимизация: Начинаем читать ответ, как только пришли заголовки (ResponseHeadersRead)
+                var apiResponse = await _httpClient.SendAsync(forwardRequest, HttpCompletionOption.ResponseHeadersRead);
+                
                 if (!apiResponse.IsSuccessStatusCode)
                 {
                     return StatusCode((int)apiResponse.StatusCode, "Служба аналитики вернула ошибку при обработке отчета.");
                 }
 
-                var content = await apiResponse.Content.ReadAsStringAsync();
-                return Content(content, "application/json");
+                // Читаем бинарный контент напрямую как поток байт
+                var responseStream = await apiResponse.Content.ReadAsStreamAsync();
+                
+                // Извлекаем Content-Type, возвращенный аналитикой (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
+                var contentType = apiResponse.Content.Headers.ContentType?.ToString() 
+                                  ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+                // Пробрасываем "чистый" стрим фронтенду
+                return File(responseStream, contentType);
             }
             catch (Exception ex)
             {
