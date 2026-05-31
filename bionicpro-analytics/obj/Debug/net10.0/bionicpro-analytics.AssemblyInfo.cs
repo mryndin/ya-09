@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("bionicpro-analytics")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8aa07c4770c8fd840630b004581e8f5ea6d43b48")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9fe0206990ff89590c457fe00468160b36e34260")]
 [assembly: System.Reflection.AssemblyProductAttribute("bionicpro-analytics")]
 [assembly: System.Reflection.AssemblyTitleAttribute("bionicpro-analytics")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

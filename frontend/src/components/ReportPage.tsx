@@ -43,17 +43,30 @@ const ReportPage: React.FC = () => {
         throw new Error(textError || `Ошибка сервера: ${response.status}`);
       }
 
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
+      // ИСПРАВЛЕНО: Читаем ответ как JSON, а не как Blob-объект
+      const data = await response.json();
       
-      link.setAttribute('download', `analytics_report_${fromDate}_to_${toDate}.xlsx`);
+      if (!data || !data.url) {
+        throw new Error('Служба аналитики вернула некорректный формат данных (отсутствует ссылка).');
+      }
+
+      // Извлекаем детерминированную ссылку на CDN (Nginx) из JSON-ответа
+      const cdnDownloadUrl = data.url;
+      console.log(`[BFF Cache Status] Файл получен из кэша S3: ${data.fromCache}`);
+
+      // Создаем виртуальную ссылку в DOM для скачивания файла браузером напрямую из CDN
+      const link = document.createElement('a');
+      link.href = cdnDownloadUrl;
+      
+      // Выделяем имя файла из URL (например, report_20260524_to_20260530.xlsx)
+      const fileName = cdnDownloadUrl.substring(cdnDownloadUrl.lastIndexOf('/') + 1);
+      link.setAttribute('download', fileName);
       
       document.body.appendChild(link);
       link.click();
+      
+      // Подчищаем за собой DOM-дерево
       link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
       
       setSuccess(true);
     } catch (err) {
@@ -85,7 +98,7 @@ const ReportPage: React.FC = () => {
             <input 
               type="date" 
               value={toDate}
-              max={maxDateString} // Ограничиваем только обработанными Airflow данными
+              max={maxDateString}
               onChange={(e) => setToDate(e.target.value)}
               className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

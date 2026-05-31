@@ -1,6 +1,7 @@
+using Amazon.S3;
+using Amazon.S3.Model;
 using ClickHouse.Client.ADO;
 using ClosedXML.Excel;
-using DocumentFormat.OpenXml.Bibliography;
 using Microsoft.AspNetCore.Mvc;
 using System.Data.Common;
 
@@ -14,22 +15,36 @@ var chConnectionString = rawConnString
     .Replace("port=9000", "Port=8123", StringComparison.OrdinalIgnoreCase)
     .Replace("user=", "Username=", StringComparison.OrdinalIgnoreCase);
 
-// Регистрируем исправленную строку
+// Регистрируем исправленную строку подключения и репозиторий
 builder.Services.AddSingleton(chConnectionString);
 builder.Services.AddScoped<IReportRepository, ClickHouseReportRepository>();
 
+// Регистрируем клиент Amazon S3. 
+// Внутри Docker-сети аналитика видит MinIO по имени сервиса и внутреннему порту 9005
+builder.Services.AddSingleton<IAmazonS3>(sp =>
+{
+    var config = new AmazonS3Config
+    {
+        ServiceURL = "http://minio:9000",
+        ForcePathStyle = true // Обязательно для корректной работы с MinIO/Ceph
+    };
+
+    return new AmazonS3Client("minio_admin", "minio_secure_password", config);
+});
+
 var app = builder.Build();
 
+// ИСПРАВЛЕНО: Теперь эндпоинт возвращает JSON (IResult) со ссылкой на CDN вместо бинарного потока
 app.MapGet("/api/internal/reports", async (
     [FromHeader(Name = "X-User-Id")] string rawUserId,
     [FromQuery] DateTime? fromDate,
     [FromQuery] DateTime? toDate,
-    IReportRepository reportRepo) =>
+    IReportRepository reportRepo,
+    IAmazonS3 s3Client) =>
 {
     try
     {
         // Предусматриваем генерацию только за обработанный период.
-        // Airflow считает данные максимум за вчерашний день, поэтому запрещаем брать "сегодня" и будущее.
         var maxAllowedDate = DateTime.UtcNow.Date.AddDays(-1);
 
         // Если даты не переданы с фронтенда, ставим дефолт (например, последние 30 дней)
@@ -44,10 +59,46 @@ app.MapGet("/api/internal/reports", async (
 
         if (finalFromDate > finalToDate)
         {
-            return Results.BadRequest("Некорректный период: начальная дата не может быть больше конечной или превышать обработанный Airflow период.");
+            return Results.BadRequest("Некорректный период: начальная дата не может быть больше конечной.");
         }
 
-        // Передаем даты в репозиторий для фильтрации в SQL/ClickHouse запросе
+        string bucketName = "bionicpro-reports";
+
+        // 1. Файл должен физически лежать в папке reports/ внутри бакета MinIO
+        string s3Key = $"reports/{rawUserId.ToLower()}/report_{finalFromDate:yyyyMMdd}_to_{finalToDate:yyyyMMdd}.xlsx";
+
+        // 2. Внешний адрес CDN
+        string cdnBaseUrl = "http://localhost:8082";
+
+        // 3. Ссылка для фронтенда (совпадает с вашей работающей ссылкой)
+        string cdnUrl = $"{cdnBaseUrl}/{s3Key}";
+
+        bool fileExists = false;
+        try
+        {
+            // Быстрая проверка: запрашиваем только метаданные объекта в S3, не скачивая сам файл
+            await s3Client.GetObjectMetadataAsync(bucketName, s3Key);
+            fileExists = true;
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            fileExists = false;
+        }
+
+        // ==========================================
+        // КЭШ-ХИТ: Файл уже есть в S3
+        // ==========================================
+        if (fileExists)
+        {
+            Console.WriteLine($"[Cache HIT] Отчет найден в S3: {s3Key}. Возвращаем URL к CDN.");
+            return Results.Ok(new { url = cdnUrl, fromCache = true });
+        }
+
+        // ==========================================
+        // КЭШ-МИСС: Файла нет -> Считываем ClickHouse и генерируем
+        // ==========================================
+        Console.WriteLine($"[Cache MISS] Отчет отсутствует в S3. Запрашиваем ClickHouse для: {s3Key}");
+
         var reports = await reportRepo.GetReportsByUserIdAndPeriodAsync(rawUserId.ToLower(), finalFromDate, finalToDate);
 
         if (reports == null || !reports.Any())
@@ -55,7 +106,7 @@ app.MapGet("/api/internal/reports", async (
             return Results.NotFound("Нет данных для формирования отчета.");
         }
 
-        // 2. Генерируем Excel-книгу в памяти
+        // Генерируем Excel-книгу в памяти
         using var workbook = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Активность");
 
@@ -64,7 +115,6 @@ app.MapGet("/api/internal/reports", async (
         worksheet.Cell(1, 2).Value = "Количество шагов";
         worksheet.Cell(1, 3).Value = "Модель устройства";
 
-        // Стилизуем шапку таблицы
         var headerRow = worksheet.Row(1);
         headerRow.Style.Font.Bold = true;
         headerRow.Style.Fill.BackgroundColor = XLColor.FromHtml("#EAECEF");
@@ -80,28 +130,30 @@ app.MapGet("/api/internal/reports", async (
             currentRow++;
         }
 
-        // Корректируем ширину колонок под текст
         worksheet.Columns().AdjustToContents();
 
-        // 3. Пишем в поток
+        // Пишем в MemoryStream для отправки в хранилище
         var stream = new MemoryStream();
         workbook.SaveAs(stream);
-        stream.Position = 0; // Сбрасываем указатель на начало, чтобы прочитать целиком
+        stream.Position = 0;
 
-        string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        string fileName = $"report_{DateTime.UtcNow:yyyyMMdd}.xlsx";
+        // Загружаем готовый сгенерированный файл в MinIO бакет
+        var putRequest = new PutObjectRequest
+        {
+            BucketName = bucketName,
+            Key = s3Key,
+            InputStream = stream,
+            ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        };
+        await s3Client.PutObjectAsync(putRequest);
+        Console.WriteLine($"[S3 Upload] Новый отчет успешно сохранен в S3: {s3Key}");
 
-        // Отдаем сам поток напрямую. .NET сам закроет stream после отправки.
-        return Results.File(
-            fileStream: stream,
-            contentType: contentType,
-            fileDownloadName: fileName,
-            enableRangeProcessing: false // Отключаем докачку частями, льем одним куском
-        );
+        // Возвращаем JSON со ссылкой на проксирование через CDN
+        return Results.Ok(new { url = cdnUrl, fromCache = false });
     }
     catch (Exception ex)
     {
-        return Results.Problem($"Ошибка генерации отчета: {ex.Message}");
+        return Results.Problem($"Ошибка обработки или генерации отчета: {ex.Message}");
     }
 });
 
@@ -109,7 +161,6 @@ app.Run();
 
 // --- ДАННЫЕ И РЕПОЗИТОРИЙ ---
 
-// ИСПРАВЛЕНО: UserId теперь имеет тип string для хранения UUID
 public record UserProstheticReportDto(
     string UserId, string ReportDate, string ModelName, int StepsCount,
     float ActiveHours, int BatteryCycles, string LastServiceDate
@@ -117,10 +168,7 @@ public record UserProstheticReportDto(
 
 public interface IReportRepository
 {
-    // Ваш старый метод (если он остался)
     Task<IEnumerable<UserProstheticReportDto>> GetReportsByUserIdAsync(string userId);
-
-    // ДОБАВЬТЕ ЭТУ СТРОКУ:
     Task<IEnumerable<UserProstheticReportDto>> GetReportsByUserIdAndPeriodAsync(string userId, DateTime fromDate, DateTime toDate);
 }
 
@@ -140,10 +188,10 @@ public class ClickHouseReportRepository : IReportRepository
         await using var connection = new ClickHouseConnection(_connectionString);
         await connection.OpenAsync();
 
-        // ИСПРАВЛЕНО: Приводим обе стороны сравнения к нижнему регистру в SQL
+        // ИСПРАВЛЕНО: Читаем из новой CDC-витрины с использованием FINAL для получения актуальных версий
         const string query = @"
         SELECT toString(user_guid) as user_guid, report_date, model_name, steps_count, active_hours, battery_cycles, last_service_date 
-        FROM default.v_user_prosthetic_reports 
+        FROM default.v_user_prosthetic_reports_cdc FINAL
         WHERE lower(toString(user_guid)) = lower(@userId)
         ORDER BY report_date DESC";
 
@@ -152,13 +200,12 @@ public class ClickHouseReportRepository : IReportRepository
 
         var param = command.CreateParameter();
         param.ParameterName = "userId";
-        param.Value = userId; // Передаем как есть
+        param.Value = userId;
         command.Parameters.Add(param);
 
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            // ИСПРАВЛЕНО: Чтение первого поля как string (UUID)
             string resUserId = reader.IsDBNull(0) ? string.Empty : Convert.ToString(reader.GetValue(0)) ?? "";
             string resReportDate = reader.IsDBNull(1) ? string.Empty : Convert.ToDateTime(reader.GetValue(1)).ToString("yyyy-MM-dd");
             string resModelName = reader.IsDBNull(2) ? string.Empty : Convert.ToString(reader.GetValue(2)) ?? "";
@@ -172,7 +219,6 @@ public class ClickHouseReportRepository : IReportRepository
                 resActiveHours, resBatteryCycles, resLastServiceDate));
         }
 
-        Console.WriteLine($"[DIAGNOSTIC] Успешно прочитано строк из ClickHouse: {reports.Count}");
         return reports;
     }
 
@@ -183,6 +229,7 @@ public class ClickHouseReportRepository : IReportRepository
         await using var connection = new ClickHouseConnection(_connectionString);
         await connection.OpenAsync();
 
+        // ИСПРАВЛЕНО: Массовая выгрузка за период переведена на CDC-таблицу
         const string query = @"
         SELECT 
             toString(user_guid) as user_guid, 
@@ -192,7 +239,7 @@ public class ClickHouseReportRepository : IReportRepository
             active_hours, 
             battery_cycles, 
             last_service_date 
-        FROM default.v_user_prosthetic_reports 
+        FROM default.v_user_prosthetic_reports_cdc FINAL
         WHERE lower(toString(user_guid)) = lower({userId:String})
           AND report_date >= {fromDate:Date}
           AND report_date <= {toDate:Date}
@@ -201,30 +248,25 @@ public class ClickHouseReportRepository : IReportRepository
         await using var command = connection.CreateCommand();
         command.CommandText = query;
 
-        // 1. Параметр пользователя
         var userIdParam = command.CreateParameter();
         userIdParam.ParameterName = "userId";
         userIdParam.Value = userId.ToLower();
         command.Parameters.Add(userIdParam);
 
-        // 2. Параметр даты С (fromDate) — ПЕРЕДАЕМ СТРОКОЙ 10 БАЙТ
         var fromDateParam = command.CreateParameter();
         fromDateParam.ParameterName = "fromDate";
-        fromDateParam.Value = fromDate.ToString("yyyy-MM-dd"); // <--- Форматируем в YYYY-MM-DD
+        fromDateParam.Value = fromDate.ToString("yyyy-MM-dd");
         command.Parameters.Add(fromDateParam);
 
-        // 3. Параметр даты ПО (toDate) — ПЕРЕДАЕМ СТРОКОЙ 10 БАЙТ
         var toDateParam = command.CreateParameter();
         toDateParam.ParameterName = "toDate";
-        toDateParam.Value = toDate.ToString("yyyy-MM-dd"); // <--- Форматируем в YYYY-MM-DD
+        toDateParam.Value = toDate.ToString("yyyy-MM-dd");
         command.Parameters.Add(toDateParam);
 
         await using var reader = await command.ExecuteReaderAsync();
 
-
         while (await reader.ReadAsync())
         {
-            // ИСПРАВЛЕНО: Чтение первого поля как string (UUID)
             string resUserId = reader.IsDBNull(0) ? string.Empty : Convert.ToString(reader.GetValue(0)) ?? "";
             string resReportDate = reader.IsDBNull(1) ? string.Empty : Convert.ToDateTime(reader.GetValue(1)).ToString("yyyy-MM-dd");
             string resModelName = reader.IsDBNull(2) ? string.Empty : Convert.ToString(reader.GetValue(2)) ?? "";
@@ -238,8 +280,7 @@ public class ClickHouseReportRepository : IReportRepository
                 resActiveHours, resBatteryCycles, resLastServiceDate));
         }
 
-        Console.WriteLine($"[DIAGNOSTIC] Успешно прочитано строк из ClickHouse: {reports.Count}");
+        Console.WriteLine($"[CDC OLAP] Прочитано строк из CDC-витрины ClickHouse: {reports.Count}");
         return reports;
-
     }
 }

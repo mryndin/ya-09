@@ -84,7 +84,7 @@ namespace BionicProAuth.Controllers
                 Response.Headers.Add("X-New-Session-Id", newSessionId);
             }
 
-            // 4. ИЗВЛЕКАЕМ USER ID ИЗ JWT (ACCESS TOKEN)
+            // 4. Извлекаем User ID из JWT (Access Token)
             string userId = ExtractUserIdFromJwt(tokens.AccessToken);
             if (string.IsNullOrEmpty(userId))
             {
@@ -93,12 +93,12 @@ namespace BionicProAuth.Controllers
 
             try
             {
-                // 5. БЕЗОПАСНОЕ ПРОКСИРОВАНИЕ БИНАРНОГО ПОТОКА С ПАРАМЕТРАМИ ПЕРИОДА
+                // 5. Проксирование запроса к аналитике
                 var backendTarget = "http://bionicpro-analytics:8080";
-                
+
                 // Проверяем QueryString на пустоту и корректность
                 var queryString = Request.QueryString.HasValue ? Request.QueryString.Value : string.Empty;
-                
+
                 // Защита от мусорных символов, ломающих эндпоинты аналитики
                 if (queryString == "?" || queryString == "?*")
                 {
@@ -106,32 +106,30 @@ namespace BionicProAuth.Controllers
                 }
 
                 var targetUrl = $"{backendTarget}/api/internal/reports{queryString}";
-                
+
                 // Логируем исходящий запрос для отладки в консоли bionicpro-auth
-                Console.WriteLine($"[BFF Proxy] Forwarding request to: {targetUrl} for User-Id: {userId}");
+                Console.WriteLine($"[BFF Proxy] Forwarding metadata request to: {targetUrl} for User-Id: {userId}");
 
                 var forwardRequest = new HttpRequestMessage(HttpMethod.Get, targetUrl);
                 forwardRequest.Headers.Add("X-User-Id", userId);
 
                 // Оптимизация: Считываем только заголовки на старте
                 var apiResponse = await _httpClient.SendAsync(forwardRequest, HttpCompletionOption.ResponseHeadersRead);
-                
+
                 if (!apiResponse.IsSuccessStatusCode)
                 {
-                    // Вычитываем точную ошибку из аналитики (LINQ/ClickHouse), чтобы шлюз записал её в логи
+                    // Вычитываем точную ошибку из аналитики (например, "Нет данных за указанный период")
                     var errorDetails = await apiResponse.Content.ReadAsStringAsync();
                     Console.WriteLine($"[BFF Proxy ERROR] Analytics service returned {apiResponse.StatusCode}. Details: {errorDetails}");
-                    
+
                     return StatusCode((int)apiResponse.StatusCode, $"Служба аналитики вернула ошибку: {errorDetails}");
                 }
 
-                // Передаем бинарный контент напрямую как чистый поток байт
-                var responseStream = await apiResponse.Content.ReadAsStreamAsync();
-                
-                var contentType = apiResponse.Content.Headers.ContentType?.ToString() 
-                                  ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                // ИСПРАВЛЕНО: Теперь считываем текстовый JSON-ответ со ссылкой на CDN, а не тяжелый стрим файла
+                var jsonContent = await apiResponse.Content.ReadAsStringAsync();
 
-                return File(responseStream, contentType);
+                // Возвращаем JSON фронтенду с корректным заголовком контента
+                return Content(jsonContent, "application/json");
             }
             catch (Exception ex)
             {
@@ -168,7 +166,7 @@ namespace BionicProAuth.Controllers
                 {
                     return userIdProp.ToString();
                 }
-                
+
                 if (root.TryGetProperty("sub", out var subProp))
                 {
                     return subProp.GetString() ?? string.Empty;

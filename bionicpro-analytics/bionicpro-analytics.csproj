@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="4.0.23.5" />
     <PackageReference Include="ClickHouse.Client" Version="7.4.0" />
     <PackageReference Include="ClosedXML" Version="0.105.0" />
   </ItemGroup>

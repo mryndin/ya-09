@@ -15,4 +15,8 @@
     <SourceRoot Include="C:\Program Files (x86)\Syncfusion\Essential Studio\WPF\32.2.3\ToolboxNuGetPackages\" />
     <SourceRoot Include="C:\Program Files\dotnet\sdk\NuGetFallbackFolder\" />
   </ItemGroup>
+  <PropertyGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <PkgAWSSDK_Core Condition=" '$(PkgAWSSDK_Core)' == '' ">C:\Users\micha\.nuget\packages\awssdk.core\4.0.7.4</PkgAWSSDK_Core>
+    <PkgAWSSDK_S3 Condition=" '$(PkgAWSSDK_S3)' == '' ">C:\Users\micha\.nuget\packages\awssdk.s3\4.0.23.5</PkgAWSSDK_S3>
+  </PropertyGroup>
 </Project>
