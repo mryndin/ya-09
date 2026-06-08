@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "dgSpecHash": "PWm3wOUTGvg=",
+  "success": true,
+  "projectFilePath": "E:\\work\\Yandex\\Sprints\\ya-09\\bionicpro-analytics\\bionicpro-analytics.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\micha\\.nuget\\packages\\awssdk.core\\4.0.7.4\\awssdk.core.4.0.7.4.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\awssdk.s3\\4.0.23.5\\awssdk.s3.4.0.23.5.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\clickhouse.client\\7.4.0\\clickhouse.client.7.4.0.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\closedxml\\0.105.0\\closedxml.0.105.0.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\closedxml.parser\\2.0.0\\closedxml.parser.2.0.0.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\documentformat.openxml\\3.1.1\\documentformat.openxml.3.1.1.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\documentformat.openxml.framework\\3.1.1\\documentformat.openxml.framework.3.1.1.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\excelnumberformat\\1.1.0\\excelnumberformat.1.1.0.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\nodatime\\3.1.11\\nodatime.3.1.11.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\rbush.signed\\4.0.0\\rbush.signed.4.0.0.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\sixlabors.fonts\\1.0.0\\sixlabors.fonts.1.0.0.nupkg.sha512",
+    "C:\\Users\\micha\\.nuget\\packages\\system.io.packaging\\8.0.1\\system.io.packaging.8.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}

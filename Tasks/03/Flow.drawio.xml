@@ -1,0 +1,93 @@
+<mxfile host="app.diagrams.net" modified="2026-05-27T22:30:00.000Z" agent="BionicPRO Sequence" version="21.0.0" type="device">
+  <diagram id="bionicpro-sequence" name="BionicPRO Sequence Flow">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" background="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="ll_sources" value="Источники&#10;(CRM / Telemetry)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursive=0;outline=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;lifelineEdgeStyle&quot;};fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="80" y="40" width="140" height="400" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ll_airflow" value="Apache Airflow&#10;(ETL)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursive=0;outline=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;lifelineEdgeStyle&quot;};fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="320" y="40" width="120" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ll_clickhouse" value="ClickHouse&#10;(OLAP)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursive=0;outline=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;lifelineEdgeStyle&quot;};fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="540" y="40" width="120" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ll_api" value="bionicpro-auth&#10;(API BFF)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursive=0;outline=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;lifelineEdgeStyle&quot;};fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="760" y="40" width="120" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ll_frontend" value="Frontend&#10;(SPA)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursive=0;outline=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;lifelineEdgeStyle&quot;};fillColor=#eceff1;strokeColor=#607d8b;" vertex="1" parent="1">
+          <mxGeometry x="980" y="40" width="100" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="msg_cron" value="1. Запуск по расписанию (Cron)" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;strokeColor=#d79b00;strokeWidth=2;" edge="1" parent="1" target="ll_airflow">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="260" y="110" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg_extract" value="2. Извлечение данных (Incremental / Bulk)" style="html=1;verticalAlign=bottom;endArrow=block;curved=0;rounded=0;strokeColor=#4A90E2;strokeWidth=2;" edge="1" parent="1" source="ll_airflow" target="ll_sources">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="375" y="140" as="sourcePoint" />
+            <mxPoint x="160" y="140" as="targetPoint" />
+            <Array rel="points"><mxPoint x="270" y="140" /></Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg_extract_res" value="Данные профилей и тики телеметрии" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;curved=0;rounded=0;" edge="1" parent="1" source="ll_sources" target="ll_airflow">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="160" y="170" as="sourcePoint" />
+            <mxPoint x="375" y="170" as="targetPoint" />
+            <Array rel="points"><mxPoint x="260" y="170" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg_load" value="3. Трансформация и запись пакета (Batch Load)" style="html=1;verticalAlign=bottom;endArrow=block;curved=0;rounded=0;strokeColor=#27AE60;strokeWidth=2;" edge="1" parent="1" source="ll_airflow" target="ll_clickhouse">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="385" y="210" as="sourcePoint" />
+            <mxPoint x="595" y="210" as="targetPoint" />
+            <Array rel="points"><mxPoint x="490" y="210" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg_req" value="4. Запрос отчёта GET /api/reports" style="html=1;verticalAlign=bottom;endArrow=block;curved=0;rounded=0;strokeColor=#9673a6;strokeWidth=2;" edge="1" parent="1" source="ll_frontend" target="ll_api">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1025" y="270" as="sourcePoint" />
+            <mxPoint x="825" y="270" as="targetPoint" />
+            <Array rel="points"><mxPoint x="930" y="270" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg_select" value="5. Оптимизированный SELECT (User_ID)" style="html=1;verticalAlign=bottom;endArrow=block;curved=0;rounded=0;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1" source="ll_api" target="ll_clickhouse">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="815" y="310" as="sourcePoint" />
+            <mxPoint x="605" y="310" as="targetPoint" />
+            <Array rel="points"><mxPoint x="710" y="310" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg_select_res" value="Строки витрины отчётности" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;curved=0;rounded=0;" edge="1" parent="1" source="ll_clickhouse" target="ll_api">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="605" y="350" as="sourcePoint" />
+            <mxPoint x="815" y="350" as="targetPoint" />
+            <Array rel="points"><mxPoint x="710" y="350" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg_res" value="JSON с агрегированными данными и графиками" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;curved=0;rounded=0;" edge="1" parent="1" source="ll_api" target="ll_frontend">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="815" y="390" as="sourcePoint" />
+            <mxPoint x="1025" y="390" as="targetPoint" />
+            <Array rel="points"><mxPoint x="920" y="390" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

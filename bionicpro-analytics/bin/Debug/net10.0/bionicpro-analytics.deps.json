@@ -1,0 +1,59 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "bionicpro-analytics/1.0.0": {
+        "dependencies": {
+          "ClickHouse.Client": "7.4.0"
+        },
+        "runtime": {
+          "bionicpro-analytics.dll": {}
+        }
+      },
+      "ClickHouse.Client/7.4.0": {
+        "dependencies": {
+          "NodaTime": "3.1.11"
+        },
+        "runtime": {
+          "lib/net6.0/ClickHouse.Client.dll": {
+            "assemblyVersion": "7.4.0.0",
+            "fileVersion": "7.4.0.0"
+          }
+        }
+      },
+      "NodaTime/3.1.11": {
+        "runtime": {
+          "lib/net6.0/NodaTime.dll": {
+            "assemblyVersion": "3.1.11.0",
+            "fileVersion": "3.1.11.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "bionicpro-analytics/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ClickHouse.Client/7.4.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-7S8IUUau/SvplpFn5IHA4chObLVzRHzmxPr29/4mf99xGehfa5fvFpgmT2mQz/epyOC9d2Zgruz1pvWMOIepaA==",
+      "path": "clickhouse.client/7.4.0",
+      "hashPath": "clickhouse.client.7.4.0.nupkg.sha512"
+    },
+    "NodaTime/3.1.11": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-AYSiCHp1PLzWKVf7hEL3MJ0q9kzOWMNIaTVysXk4XKrDBzK5PF2wpd4LsAl+EIQ2Hbvu+vw4oFaexcXzCuY1lQ==",
+      "path": "nodatime/3.1.11",
+      "hashPath": "nodatime.3.1.11.nupkg.sha512"
+    }
+  }
+}
