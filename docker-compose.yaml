@@ -165,6 +165,8 @@ services:
   debezium:
     image: debezium/connect:2.4
     container_name: debezium-connect
+    ports:
+      - "8083:8083"
     depends_on:
       postgres:
         condition: service_healthy
